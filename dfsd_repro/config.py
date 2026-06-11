@@ -47,8 +47,6 @@ class ExperimentConfig:
     ash_percentile: int = 90
     scale_percentile: int = 90
     imagenet_train_samples_per_class: int = 100
-    knn_k: int = 50
-    nnguide_k: int = 10
     pca_components: int | None = None
 
     @classmethod
@@ -84,11 +82,6 @@ class ExperimentConfig:
             return self.output_root / (mode if self.c_pp == "dice" else f"{mode}_{self.c_pp}")
         if mode == "dfsd_main_pca" and self.pca_components is not None:
             return self.output_root / f"{mode}_components{self.pca_components}"
-        default_knn_k = 1000 if self.in_dataset == "imagenet" else 50
-        if mode == "knn" and self.knn_k != default_knn_k:
-            return self.output_root / f"{mode}_k{self.knn_k}"
-        if mode == "nnguide" and self.nnguide_k != 10:
-            return self.output_root / f"{mode}_k{self.nnguide_k}"
         return self.output_root / mode
 
 
@@ -122,7 +115,5 @@ def config_as_legacy_args(cfg: ExperimentConfig):
     args.ash_percentile = cfg.ash_percentile
     args.scale_percentile = cfg.scale_percentile
     args.imagenet_train_samples_per_class = cfg.imagenet_train_samples_per_class
-    args.knn_k = cfg.knn_k
-    args.nnguide_k = cfg.nnguide_k
     args.pca_components = cfg.pca_components
     return args

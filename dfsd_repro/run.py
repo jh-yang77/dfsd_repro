@@ -12,8 +12,6 @@ def parse_args():
     parser.add_argument("--config", required=True, help="Path to a JSON config.")
     parser.add_argument("--modes", nargs="*", default=None, help="Override modes from config.")
     parser.add_argument("--c-pp", choices=["dice", "ash", "scale"], default=None, help="Override C-PP component.")
-    parser.add_argument("--knn-k", type=int, default=None, help="Override K for KNN-OOD.")
-    parser.add_argument("--nnguide-k", type=int, default=None, help="Override K for NNGuide.")
     parser.add_argument("--pca-components", type=int, default=None, help="Override retained PCA components for PCA ablations.")
     parser.add_argument("--metrics-only", action="store_true", help="Only summarize existing scores.")
     return parser.parse_args()
@@ -26,10 +24,6 @@ def main():
         cfg.modes = args.modes
     if args.c_pp:
         cfg.c_pp = args.c_pp
-    if args.knn_k is not None:
-        cfg.knn_k = args.knn_k
-    if args.nnguide_k is not None:
-        cfg.nnguide_k = args.nnguide_k
     if args.pca_components is not None:
         cfg.pca_components = args.pca_components
 

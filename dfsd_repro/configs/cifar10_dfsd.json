@@ -17,8 +17,6 @@
   ],
   "fit_class_fraction": 1.0,
   "score_class_fraction": 1.0,
-  "knn_k": 50,
-  "nnguide_k": 10,
   "base_output_dir": "dfsd_repro/results",
   "subspace_cache_dir": "dfsd_repro/cache/subspaces"
 }

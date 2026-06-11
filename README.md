@@ -6,12 +6,12 @@ The repository intentionally does **not** include large datasets, checkpoints, e
 
 ## Attribution
 
-This reproduction package uses the same post-hoc OOD evaluation setting as the DICE codebase, and parts of the data/checkpoint organization, DenseNet checkpoint usage, DICE C-PP component, and baseline evaluation utilities are adapted from the official DICE repository:
+This reproduction package uses the same post-hoc OOD evaluation setting as the DICE codebase. The CIFAR data/checkpoint organization, DenseNet checkpoint usage, RouteDICE/DICE model wrapper, and the DICE-based C-PP component are adapted from the official DICE repository:
 
 - DICE GitHub: <https://github.com/deeplearning-wisc/dice>
 - DICE paper: *DICE: Leveraging Sparsification for Out-of-Distribution Detection*, ECCV 2022.
 
-Please cite DICE when using the DICE baseline/checkpoints or DICE-derived C-PP implementation:
+Please cite DICE when using the DICE checkpoints or DICE-derived C-PP implementation:
 
 ```bibtex
 @inproceedings{sun2022dice,
@@ -34,6 +34,8 @@ C-SP       = max_c -alpha_c * ||z - inverse_c(transform_c(z - u))||
 
 The paper setting is `dfsd_main`: C-PP uses the DICE/RouteDICE logits, and C-SP uses class-wise KPCA residuals. The PCA variant `dfsd_main_pca` changes only the C-SP estimator from KPCA to PCA.
 
+![DFSD framework](docs/DFSD_framework.png)
+
 ## Reproducibility Protocol
 
 ### Hyperparameters
@@ -42,7 +44,7 @@ The paper setting is `dfsd_main`: C-PP uses the DICE/RouteDICE logits, and C-SP 
 |---|---:|---:|---|---|---:|---|---|---|
 | CIFAR-10 | DenseNet | 60 | class-wise KPCA | Gaussian/RBF | `dim=150` | all ID train classes | all classes | class-wise `alpha_c` |
 | CIFAR-100 | DenseNet | 90 | class-wise KPCA | Gaussian/RBF | `dim=250` | all ID train classes | all classes | class-wise `alpha_c` |
-| ImageNet-1K | ResNet-50 | 60 | class-wise KPCA | Gaussian/RBF | `dim=819` | 100 images/class | class fraction `0.1` | class-wise `alpha_c` |
+| ImageNet-1K | ResNet-50 | 60 | class-wise KPCA | Gaussian/RBF | `dim=100` | 100 images/class | class fraction `0.1` | class-wise `alpha_c` |
 
 `dim` follows the paper code convention: the retained KPCA subspace size is computed from the feature dimension and `dim` in `dfsd_repro/dfsd.py`. For ImageNet, `score_class_fraction=0.1` means 10% of ImageNet-1K classes are used for class-wise C-SP scoring; it is not an explained-variance-ratio threshold.
 
@@ -64,7 +66,7 @@ ID/OOD splits follow the standard post-hoc OOD protocol used by DICE and related
 | CIFAR-100 | SVHN, LSUN, LSUN_resize, iSUN, DTD, Places365 | DenseNet checkpoint from DICE-style setup | CIFAR-100 test vs each OOD test set |
 | ImageNet-1K | iNaturalist, SUN, Places, DTD | torchvision ResNet-50 | ImageNet validation vs each OOD set |
 
-All compared methods use the same backbone, feature extractor, ID/OOD splits, and metric implementation. ID samples are treated as positive examples. The operating threshold for FPR95 is set so that 95% of ID samples are accepted.
+All DFSD variants use the same backbone, feature extractor, ID/OOD splits, and metric implementation. ID samples are treated as positive examples. The operating threshold for FPR95 is set so that 95% of ID samples are accepted.
 
 ### Metrics
 
@@ -83,7 +85,7 @@ dfsd_repro/
   models/                  # DenseNet/ResNet/RouteDICE model definitions
   utils/                   # dataset, metric, and scoring helpers
   check_assets.py          # validates required local assets before running
-  dfsd.py                  # DFSD, PCA/KPCA, KNN, NNGuide scoring
+  dfsd.py                  # DFSD scoring and PCA/KPCA C-SP variants
   run.py                   # run one config
   run_suite.py             # run CIFAR-10, CIFAR-100, ImageNet configs
   run_ablation.py          # component ablations
@@ -167,7 +169,7 @@ dfsd_repro/results/
 dfsd_repro/cache/subspaces/
 ```
 
-## Ablations and Baselines
+## Ablations
 
 C-PP ablation:
 
@@ -181,20 +183,6 @@ C-SP variants:
 ```bash
 python -m dfsd_repro.run --config dfsd_repro/configs/cifar10_dfsd.json --modes csp_kpca csp_pca dfsd_main_pca
 python -m dfsd_repro.run --config dfsd_repro/configs/imagenet_dfsd.json --modes dfsd_main_pca --pca-components 3
-```
-
-Distance baselines:
-
-```bash
-python -m dfsd_repro.run --config dfsd_repro/configs/cifar10_dfsd.json --modes knn nnguide
-python -m dfsd_repro.run --config dfsd_repro/configs/cifar100_dfsd.json --modes knn nnguide
-python -m dfsd_repro.run --config dfsd_repro/configs/imagenet_dfsd.json --modes knn nnguide
-```
-
-NNGuide nearest-neighbor sweep:
-
-```bash
-python -m dfsd_repro.sweep_nnguide --config dfsd_repro/configs/imagenet_dfsd.json --ks 10 50 100 200 500 1000
 ```
 
 ## Visualizations

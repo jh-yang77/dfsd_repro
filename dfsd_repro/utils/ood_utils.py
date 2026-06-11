@@ -147,42 +147,7 @@ class GaussianNoiseDataset(Dataset):
         return self.num_images
 
     def __getitem__(self, idx):
-        # 生成高斯噪声图像
         noise = np.random.normal(loc=self.mean, scale=self.std, size=(3, *self.image_size)).astype(np.float32)
-        # noise = torch.from_numpy(noise)
         if self.transform:
             noise = self.transform(noise)
         return noise
-def nng_score(ood_scores,feas,args,knn_k=2000):
-    if args.p == None:
-        usedice = 'wo_useless'
-    else:
-        usedice = 'w_useless'
-    known = np.loadtxt(
-        '{base_dir}/{in_dataset}/{method}/densenet-train/{usedice}/in_scores_p{p}_dim{dim}.txt'.format(base_dir=args.base_dir,
-                in_dataset=args.in_dataset,usedice=usedice,method=args.method, p=args.p,dim=args.dim))
-
-    if args.in_dataset == 'CIFAR-10' or args.in_dataset == 'CIFAR-100':
-        key = args.in_dataset.lower().replace("-", "")
-        feas_train = np.load(package_path("features", f"{key}_train_{args.model_arch}_features.npy"), allow_pickle=True)
-        # target_id_train = data[2].T
-    elif args.in_dataset == 'imagenet':
-        feas_train = np.load(package_path("imagenet_feature", "imagenet_train_resnet50_features.npy"), allow_pickle=True)
-    # feas_train = deepcopy(np.array(feature_id_train))
-    # feas = deepcopy(np.array(feas))
-
-    feas_train = torch.from_numpy(feas_train).float().to('cuda')
-    # feas = torch.from_numpy(feas).float().to('cuda')
-    known = torch.from_numpy(known).float().to('cuda')
-    feas_train = F.normalize(feas_train, p=2, dim=1)
-    feas = F.normalize(feas, p=2, dim=1)
-    # 计算余弦相似度
-    cos_sim = torch.mm(feas, feas_train.T)
-    cos_sim = (known.unsqueeze(1)*(cos_sim.T)).T
-
-    # 对于每个查询向量，获取最大的 knn_k 个值及其索引
-    D, I = torch.topk(cos_sim, knn_k, dim=1)
-
-    guidances = np.array(D.cpu().detach().numpy().mean(axis=1))
-    scores = guidances * ood_scores
-    return scores

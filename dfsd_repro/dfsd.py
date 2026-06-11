@@ -40,8 +40,6 @@ MODE_ALIASES = {
     "c_sp_kpca": "csp_kpca",
     "csp_pca": "csp_pca",
     "c_sp_pca": "csp_pca",
-    "knn": "knn",
-    "nnguide": "nnguide",
 }
 VALID_MODES = set(MODE_ALIASES)
 
@@ -350,42 +348,6 @@ def score_numpy(features, outputs, alpha, estimators, u, mode: str):
     return c_pp + c_sp
 
 
-def _l2_normalize_np(features: np.ndarray) -> np.ndarray:
-    denom = norm(features, axis=1, keepdims=True)
-    denom[denom == 0] = 1.0
-    return features / denom
-
-
-def prepare_distance_baseline_state(cfg: ExperimentConfig, model, num_classes: int):
-    feature_id_train, _, _ = load_or_extract_train_features(cfg, model, num_classes)
-    weight_matrix, bias_vector = classifier_params(model, cfg)
-    train_logits = feature_id_train @ weight_matrix.T + bias_vector
-    train_energy = logsumexp(train_logits, axis=-1)
-    knn_features = torch.from_numpy(_l2_normalize_np(feature_id_train).astype(np.float32)).cuda()
-    nnguide_features = torch.from_numpy((feature_id_train * train_energy[:, None]).astype(np.float32)).cuda()
-    train_energy = torch.from_numpy(train_energy.astype(np.float32)).cuda()
-    return {"knn_features": knn_features, "nnguide_features": nnguide_features, "energy": train_energy}
-
-
-def score_distance_baseline(features, outputs, state, mode: str, cfg: ExperimentConfig):
-    if mode == "knn":
-        query = torch.from_numpy(_l2_normalize_np(features).astype(np.float32)).cuda()
-        similarities = torch.mm(query, state["knn_features"].T)
-        k = min(cfg.knn_k, similarities.shape[1])
-        values = torch.topk(similarities, k, dim=1).values
-        # KNN-OOD uses IndexFlatL2 on L2-normalized features and scores by -D[:, -1].
-        return (2.0 * values[:, -1] - 2.0).cpu().numpy()
-    if mode == "nnguide":
-        query = torch.from_numpy(features.astype(np.float32)).cuda()
-        guided = torch.mm(query, state["nnguide_features"].T)
-        k = min(cfg.nnguide_k, guided.shape[1])
-        values = torch.topk(guided, k, dim=1).values
-        guidance = values.mean(dim=1).cpu().numpy()
-        energy = logsumexp(outputs, axis=-1)
-        return energy * guidance
-    raise ValueError(f"Unsupported distance baseline mode: {mode}")
-
-
 def write_scores(loader, model, cfg: ExperimentConfig, mode: str, alpha, estimators, u, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -393,19 +355,6 @@ def write_scores(loader, model, cfg: ExperimentConfig, mode: str, alpha, estimat
             images = data[0].cuda()
             features, outputs = extract_features_and_logits(model, images, cfg)
             scores = score_numpy(features, outputs, alpha, estimators, u, mode)
-            for score in scores:
-                f.write(f"{score}\n")
-            if batch_idx % 10 == 0:
-                print(f"{mode}: {batch_idx + 1}/{len(loader)}")
-
-
-def write_distance_scores(loader, model, cfg: ExperimentConfig, mode: str, state, path: Path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        for batch_idx, data in enumerate(loader):
-            images = data[0].cuda()
-            features, outputs = extract_features_and_logits(model, images, cfg)
-            scores = score_distance_baseline(features, outputs, state, mode, cfg)
             for score in scores:
                 f.write(f"{score}\n")
             if batch_idx % 10 == 0:
@@ -423,16 +372,6 @@ def run_mode(cfg: ExperimentConfig, mode: str):
     feat_path, label_path, mean_path = train_feature_paths(cfg)
     if not (feat_path.exists() and label_path.exists() and mean_path.exists()) or cfg.force_refit:
         extract_train_features(cfg, backbone_model, num_classes)
-
-    if mode in {"knn", "nnguide"}:
-        model = backbone_model
-        state = prepare_distance_baseline_state(cfg, model, num_classes)
-        score_dir = cfg.score_dir(mode)
-        write_distance_scores(loader_in, model, cfg, mode, state, score_dir / "in_scores.txt")
-        for out_dataset in cfg.out_datasets:
-            loader_out = get_outdataset(out_dataset, cfg.in_dataset, cfg.batch_size)
-            write_distance_scores(loader_out, model, cfg, mode, state, score_dir / out_dataset / "out_scores.txt")
-        return
 
     if not use_route_dice(cfg):
         args.p = None
