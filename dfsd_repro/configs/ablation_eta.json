@@ -1,0 +1,44 @@
+{
+  "labels": [
+    "$\\eta=\\frac{1}{8}$",
+    "$\\eta=\\frac{1}{4}$",
+    "$\\eta=\\frac{1}{2}$",
+    "$\\eta=1$"
+  ],
+  "metrics": [
+    {
+      "filename": "ablation_eta_auroc.pdf",
+      "ylabel": "AUROC (%)",
+      "values": [
+        93.23,
+        94.99,
+        94.19,
+        93.62
+      ],
+      "ylim": [
+        90,
+        97.5
+      ],
+      "bar_color": "#A8C8E6",
+      "line_color": "steelblue",
+      "label_offset": 0.2
+    },
+    {
+      "filename": "ablation_eta_fpr95.pdf",
+      "ylabel": "FPR95 (%)",
+      "values": [
+        28.92,
+        23.0,
+        26.05,
+        26.84
+      ],
+      "ylim": [
+        20,
+        32
+      ],
+      "bar_color": "#E5A19A",
+      "line_color": "indianred",
+      "label_offset": 0.3
+    }
+  ]
+}

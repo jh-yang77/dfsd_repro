@@ -1,0 +1,24 @@
+{
+  "experiment_name": "cifar10_densenet_dfsd",
+  "in_dataset": "CIFAR-10",
+  "model_arch": "densenet",
+  "model_name": "densenet",
+  "p": 60,
+  "dim": 150,
+  "seed": 1,
+  "gpu": "0",
+  "batch_size": 224,
+  "modes": [
+    "dfsd_main",
+    "cpp_dice",
+    "csp_kpca",
+    "dfsd_main_pca",
+    "csp_pca"
+  ],
+  "fit_class_fraction": 1.0,
+  "score_class_fraction": 1.0,
+  "knn_k": 50,
+  "nnguide_k": 10,
+  "base_output_dir": "dfsd_repro/results",
+  "subspace_cache_dir": "dfsd_repro/cache/subspaces"
+}

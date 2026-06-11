@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Local environments
+.venv/
+.env
+
+# Large experiment assets: keep local, do not upload
+/dfsd_repro/checkpoints/
+/dfsd_repro/features/
+/dfsd_repro/imagenet_feature/
+/dfsd_repro/id_datasets/
+/dfsd_repro/ood_datasets/
+/dfsd_repro/cache/
+/dfsd_repro/results/
+/dfsd_repro/figures/
+/dfsd_repro/ood_checkpoints/
+
+# Archives and generated logs
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.log

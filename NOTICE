@@ -1,0 +1,12 @@
+DFSD reproducibility code
+
+This repository contains reproduction code for:
+Out-of-Distribution Detection with Directed Feature Space Decomposition (DFSD).
+
+Parts of the data/checkpoint organization, baseline evaluation workflow, and the DICE-based C-PP implementation are adapted from the official DICE repository:
+https://github.com/deeplearning-wisc/dice
+
+DICE paper:
+Sun, Y., Guo, C., and Li, Y. DICE: Leveraging Sparsification for Out-of-Distribution Detection. ECCV 2022.
+
+Please cite the original DICE work when using the DICE baseline/checkpoints or code paths derived from the DICE implementation. Users should also follow the license and usage terms of the upstream DICE repository and the corresponding datasets/checkpoints.

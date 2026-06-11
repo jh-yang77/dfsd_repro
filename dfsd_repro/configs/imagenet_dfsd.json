@@ -1,0 +1,22 @@
+{
+  "experiment_name": "imagenet_resnet50_dfsd",
+  "in_dataset": "imagenet",
+  "model_arch": "resnet50",
+  "model_name": "resnet50",
+  "p": 60,
+  "dim": 819,
+  "seed": 1,
+  "gpu": "0",
+  "batch_size": 224,
+  "modes": [
+    "dfsd_main"
+  ],
+  "fit_class_fraction": 1.0,
+  "score_class_fraction": 0.1,
+  "imagenet_train_samples_per_class": 100,
+  "knn_k": 1000,
+  "nnguide_k": 10,
+  "pca_components": 3,
+  "base_output_dir": "dfsd_repro/results",
+  "subspace_cache_dir": "dfsd_repro/cache/subspaces"
+}
