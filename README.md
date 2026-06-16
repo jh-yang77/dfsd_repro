@@ -84,7 +84,6 @@ dfsd_repro/
   configs/                 # fixed experiment configs
   models/                  # DenseNet/ResNet/RouteDICE model definitions
   utils/                   # dataset, metric, and scoring helpers
-  check_assets.py          # validates required local assets before running
   dfsd.py                  # DFSD scoring and PCA/KPCA C-SP variants
   run.py                   # run one config
   run_suite.py             # run CIFAR-10, CIFAR-100, ImageNet configs
@@ -123,24 +122,27 @@ dfsd_repro/checkpoints/CIFAR-10/densenet/checkpoint_100.pth.tar
 dfsd_repro/checkpoints/CIFAR-100/densenet/checkpoint_100.pth.tar
 ```
 
-Dataset sources:
+Dataset and checkpoint preparation follows the official DICE repository:
+<https://github.com/deeplearning-wisc/dice>
 
-- CIFAR-10/CIFAR-100: <https://www.cs.toronto.edu/~kriz/cifar.html>
+For CIFAR OOD datasets, use the DICE download links and place the extracted
+datasets under `dfsd_repro/ood_datasets/`:
+
 - SVHN: <http://ufldl.stanford.edu/housenumbers/>
 - DTD: <https://www.robots.ox.ac.uk/~vgg/data/dtd/>
-- Places365: <http://places2.csail.mit.edu/download.html>
-- LSUN: <https://www.yf.io/p/lsun>
+- Places365: <http://data.csail.mit.edu/places/places365/test_256.tar>
+- LSUN-C: <https://www.dropbox.com/s/fhtsw1m3qxlwj6h/LSUN.tar.gz>
+- LSUN-R: <https://www.dropbox.com/s/moqh2wh8696c3yl/LSUN_resize.tar.gz>
+- iSUN: <https://www.dropbox.com/s/ssz7qxfqae0cca5/iSUN.tar.gz>
+
+For ImageNet-1K experiments, prepare ImageNet from the official source and use
+the curated large-scale OOD links used by DICE:
+
 - ImageNet-1K: <https://image-net.org/download.php>
-- Large-scale OOD sets: <https://github.com/deeplearning-wisc/large_scale_ood>
-- DICE assets/checkpoint reference: <https://github.com/deeplearning-wisc/dice>
-
-Check assets before running:
-
-```bash
-python -m dfsd_repro.check_assets --config dfsd_repro/configs/cifar10_dfsd.json
-python -m dfsd_repro.check_assets --config dfsd_repro/configs/cifar100_dfsd.json
-python -m dfsd_repro.check_assets --config dfsd_repro/configs/imagenet_dfsd.json
-```
+- iNaturalist: <http://pages.cs.wisc.edu/~huangrui/imagenet_ood_dataset/iNaturalist.tar.gz>
+- SUN: <http://pages.cs.wisc.edu/~huangrui/imagenet_ood_dataset/SUN.tar.gz>
+- Places: <http://pages.cs.wisc.edu/~huangrui/imagenet_ood_dataset/Places.tar.gz>
+- Textures: <https://www.robots.ox.ac.uk/~vgg/data/dtd/>
 
 ## Run Main Experiments
 
@@ -150,7 +152,7 @@ python -m dfsd_repro.run --config dfsd_repro/configs/cifar100_dfsd.json --modes 
 python -m dfsd_repro.run --config dfsd_repro/configs/imagenet_dfsd.json --modes dfsd_main
 ```
 
-Run all configs with asset checks:
+Run all configs:
 
 ```bash
 python -m dfsd_repro.run_suite
