@@ -34,7 +34,7 @@ C-SP       = max_c -alpha_c * ||z - inverse_c(transform_c(z - u))||
 
 The paper setting is `dfsd_main`: C-PP uses the DICE/RouteDICE logits, and C-SP uses class-wise KPCA residuals. The PCA variant `dfsd_main_pca` changes only the C-SP estimator from KPCA to PCA.
 
-![DFSD framework](docs/DFSD_framework.pdf)
+![DFSD framework](docs/DFSD_framework.png)
 
 ## Reproducibility Protocol
 
