@@ -174,6 +174,16 @@ the curated large-scale OOD links used by DICE:
 - Places: <http://pages.cs.wisc.edu/~huangrui/imagenet_ood_dataset/Places.tar.gz>
 - Textures: <https://www.robots.ox.ac.uk/~vgg/data/dtd/>
 
+### Recreate the SVHN Evaluation Subset
+
+After downloading the official `test_32x32.mat`, run:
+
+```bash
+python -m dfsd_repro.prepare_svhn
+```
+
+This creates `selected_test_32x32.mat`, the filename used by the evaluation loader. The checked-in index manifest was recovered by exact image-byte and label matching against the archived 10,000-image subset. It reproduces that subset and its order; it does not draw a new random subset. The command checks the source-file hash and verifies an existing selected file rather than overwriting different data.
+
 ### Expected Data Layout
 
 Dataset loaders expect these paths (directory names are case-sensitive):
@@ -184,6 +194,7 @@ dfsd_repro/id_datasets/CIFAR-100/cifar-100-python/
 dfsd_repro/id_datasets/imagenet/train/<class>/
 dfsd_repro/id_datasets/imagenet/val/<class>/
 dfsd_repro/ood_datasets/svhn/test_32x32.mat
+dfsd_repro/ood_datasets/svhn/selected_test_32x32.mat  # generated below
 dfsd_repro/ood_datasets/LSUN/<class>/
 dfsd_repro/ood_datasets/LSUN_resize/<class>/
 dfsd_repro/ood_datasets/iSUN/<class>/
@@ -194,7 +205,14 @@ dfsd_repro/ood_datasets/SUN/<class>/
 dfsd_repro/ood_datasets/Places/<class>/
 ```
 
-ImageFolder-based datasets require image-containing subdirectories. Keep ImageNet validation images organized by class. Training feature extraction and preprocessing are defined in [`dfsd.py`](dfsd_repro/dfsd.py); evaluation loaders are defined in [`ood_utils.py`](dfsd_repro/utils/ood_utils.py).
+ImageFolder-based datasets require image-containing subdirectories. Keep ImageNet validation images organized by class. The checked-in `manifests/*_files.json` files identify the exact relative image paths in the archived evaluation folders, including the 2,000-image Places365 subset. To create evaluation folders from downloaded source folders with the layout above, use:
+
+```bash
+python -m dfsd_repro.prepare_ood --source-root /path/to/downloaded_ood --target-root dfsd_repro/ood_datasets
+python -m dfsd_repro.prepare_ood --target-root dfsd_repro/ood_datasets
+```
+
+The first command creates links to the listed images; it does not draw a new random subset. The second checks for missing or extra image paths. The source images must be the corresponding dataset versions; path manifests do not replace content checksums. Expected counts are 10,000 each for LSUN, LSUN_resize, iNaturalist, SUN and Places; 8,925 for iSUN; 5,640 for DTD; and 2,000 for Places365. Training feature extraction and preprocessing are defined in [`dfsd.py`](dfsd_repro/dfsd.py); evaluation loaders are defined in [`ood_utils.py`](dfsd_repro/utils/ood_utils.py).
 
 ## Run Main Experiments
 
@@ -223,9 +241,13 @@ dfsd_repro/results/
 dfsd_repro/cache/subspaces/
 ```
 
+### Shared Preprocessing
+
+CIFAR fitting, ID evaluation, and OOD evaluation share Resize(32), CenterCrop(32), and the normalization `(0.4914, 0.4822, 0.4465) / (0.2023, 0.1994, 0.2010)` used by the DenseNet evaluation loader. ImageNet stages share Resize(256), CenterCrop(224), and ImageNet normalization. The shared transform removes the previous CIFAR-100 train/test mismatch. Updated CIFAR features are stored under `features/shared_transforms_v2/`, separate from old caches.
+
 ### Random Seeds and Cached Fits
 
-The JSON configuration controls `seed` and `force_refit`; these are not command-line flags. The first run creates training-feature files and class-model caches. Later runs reuse these files by default. When changing checkpoints, preprocessing, or fitting settings, set `force_refit` to `true` and use distinct output/cache directories to avoid mixing runs. For example:
+The JSON configuration controls `seed` and `force_refit`; these are not command-line flags. The first run creates training-feature files and class-model caches. ImageNet feature paths include the seed, per-class sample count and fitting-class fraction; fitted-model paths include a configuration fingerprint. Later runs reuse these files by default. When changing checkpoints, preprocessing, or fitting settings, set `force_refit` to `true` and use distinct output/cache directories to avoid mixing runs. For example:
 
 ```bash
 python - <<'PYCONFIG'
@@ -241,7 +263,26 @@ PYCONFIG
 python -m dfsd_repro.run --config cifar10_fresh.json --modes dfsd_main
 ```
 
-Regeneration also replaces the dataset's training-feature files. Run such configurations sequentially. Once the desired features and fitted models exist, set `force_refit` back to `false` to reuse them.
+Regeneration also replaces the training-feature files for that preprocessing and sampling configuration. Run such configurations sequentially. Once the desired features and fitted models exist, set `force_refit` back to `false` to reuse them.
+
+### Five-Seed Runs
+
+```bash
+python -m dfsd_repro.run_seeds --config dfsd_repro/configs/cifar10_dfsd.json --seeds 0 1 2 3 4
+python -m dfsd_repro.run_seeds --config dfsd_repro/configs/cifar100_dfsd.json --seeds 0 1 2 3 4
+python -m dfsd_repro.run_seeds --config dfsd_repro/configs/imagenet_dfsd.json --seeds 0 1 2 3 4
+```
+
+The runner writes separate configurations, outputs and fitted-model caches for each seed, then summarizes means and sample standard deviations in `seed_runs/summary.csv`. Use `--prepare-only` to inspect configurations before running, or `--metrics-only` to summarize saved scores.
+
+### MobileNetV2 and EVR Entry Points
+
+```bash
+python -m dfsd_repro.run --config dfsd_repro/configs/imagenet_mobilenetv2_example.json --modes dfsd_main
+python -m dfsd_repro.run_evr --config dfsd_repro/configs/imagenet_dfsd.json --evr 0.1 0.5 0.9 0.99 1.0
+```
+
+The MobileNetV2 example uses the included pretrained model adapter and a 1,280-dimensional representation. Its configuration makes the runner executable; its copied sampling/hyperparameter settings have not been established as the settings behind the historical MobileNetV2 table. EVR selects, per class, the smallest rank covering the requested fraction of positive kernel eigenvalue mass. Run `cpp_dice` separately for the component-off reference. EVR runs use the same shared scaling convention and sampling configuration as the main runner, with separate output/cache keys. The original EVR curve has not been regenerated by these new commands.
 
 ## Outputs and Run Records
 
@@ -258,6 +299,8 @@ dfsd_repro/results/cifar10_densenet_dfsd/dfsd_main/
   places365/out_scores.txt
   metrics.csv
 ```
+
+Each completed inference run also writes `run_manifest.json` containing the resolved configuration, package versions, device name and completion status. The environment used for revision smoke tests is recorded in `docs/tested_environment.json`; it is not presented as the original experiment environment.
 
 Each score file contains one scalar per evaluated sample; larger scores indicate stronger ID evidence. `metrics.csv` contains one row per OOD dataset and an `AVG` row, which is the unweighted arithmetic mean over OOD datasets. The CSV stores percentages: its `FPR` column denotes FPR95, and `AUROC` is also multiplied by 100. Metric definitions and computation are in [`metrics.py`](dfsd_repro/metrics.py). The `--metrics-only` command above recalculates metrics from existing score files without rerunning inference.
 

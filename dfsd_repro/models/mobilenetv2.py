@@ -3,7 +3,7 @@ from torch import nn
 from torch import Tensor
 from torchvision._internally_replaced_utils import load_state_dict_from_url
 from typing import Callable, Any, Optional, List
-from dfsd_repro.models.route import *
+from dfsd_repro.models.route_test import RouteDICE
 from torch.autograd import Variable
 
 __all__ = ['MobileNetV2', 'mobilenet_v2']
@@ -185,8 +185,7 @@ class MobileNetV2(nn.Module):
                                             nn.Linear(self.last_channel, num_classes))
         else:
             self.classifier = nn.Sequential(nn.Dropout(0.2),
-                                            RouteDICE(self.last_channel, num_classes, p=p, info=info,
-                                                          clip_threshold=clip_threshold))
+                                            RouteDICE(self.last_channel, num_classes, p=p, info=info))
 
         # weight initialization
         for m in self.modules():

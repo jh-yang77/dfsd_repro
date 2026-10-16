@@ -48,10 +48,13 @@ class ExperimentConfig:
     scale_percentile: int = 90
     imagenet_train_samples_per_class: int = 100
     pca_components: int | None = None
+    evr: float | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "ExperimentConfig":
         cfg = cls(**raw)
+        if cfg.evr is not None and not 0 < cfg.evr <= 1:
+            raise ValueError("evr must be in (0, 1]; use cpp_dice for the component-off reference")
         if not cfg.out_datasets:
             cfg.out_datasets = list(DEFAULT_OOD[cfg.in_dataset])
         if cfg.c_pp not in {"dice", "ash", "scale"}:
@@ -60,7 +63,8 @@ class ExperimentConfig:
 
     @property
     def output_root(self) -> Path:
-        return Path(self.base_output_dir) / self.experiment_name
+        name = self.experiment_name if self.evr is None else f"{self.experiment_name}_evr{self.evr:g}"
+        return Path(self.base_output_dir) / name
 
     def score_dir(self, mode: str) -> Path:
         mode = {
@@ -116,4 +120,6 @@ def config_as_legacy_args(cfg: ExperimentConfig):
     args.scale_percentile = cfg.scale_percentile
     args.imagenet_train_samples_per_class = cfg.imagenet_train_samples_per_class
     args.pca_components = cfg.pca_components
+    args.seed = cfg.seed
+    args.fit_class_fraction = cfg.fit_class_fraction
     return args

@@ -1,0 +1,20 @@
+{
+  "experiment_name": "imagenet_mobilenetv2_example",
+  "in_dataset": "imagenet",
+  "model_arch": "mobilenetv2",
+  "model_name": "mobilenetv2",
+  "p": 60,
+  "dim": 100,
+  "seed": 1,
+  "gpu": "0",
+  "batch_size": 224,
+  "modes": [
+    "dfsd_main"
+  ],
+  "fit_class_fraction": 1.0,
+  "score_class_fraction": 0.1,
+  "imagenet_train_samples_per_class": 100,
+  "pca_components": 3,
+  "base_output_dir": "dfsd_repro/results",
+  "subspace_cache_dir": "dfsd_repro/cache/subspaces"
+}

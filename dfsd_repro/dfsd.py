@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import json
+from dataclasses import asdict
 import pickle
 import sys
 import types
@@ -20,7 +23,7 @@ from dfsd_repro.config import ExperimentConfig, config_as_legacy_args, package_p
 if "seaborn" not in sys.modules:
     sys.modules["seaborn"] = types.ModuleType("seaborn")
 
-from dfsd_repro.utils.ood_utils import get_dataloader, get_model, get_outdataset
+from dfsd_repro.utils.ood_utils import get_dataloader, get_model, get_outdataset, transform_test, transform_test_largescale
 
 
 MODE_ALIASES = {
@@ -67,59 +70,41 @@ def feature_dim_for(cfg: ExperimentConfig) -> int:
         return 512
     if cfg.in_dataset == "imagenet" and cfg.model_arch in {"resnet50", "efficientnet"}:
         return 2048
+    if cfg.in_dataset == "imagenet" and cfg.model_arch == "mobilenetv2":
+        return 1280
     if cfg.model_arch == "swin":
         return 1024
     raise ValueError(f"Unsupported feature dimension for {cfg.in_dataset}/{cfg.model_arch}")
+
+
+PREPROCESSING_VERSION = "shared_transforms_v2"
 
 
 def train_feature_paths(cfg: ExperimentConfig) -> tuple[Path, Path, Path]:
     if cfg.in_dataset in {"CIFAR-10", "CIFAR-100"} and cfg.model_arch == "densenet":
         key = cfg.in_dataset.lower().replace("-", "")
         return (
-            package_path("features", f"{key}_train_{cfg.model_arch}_features.npy"),
-            package_path("features", f"{key}_train_{cfg.model_arch}_labels.npy"),
-            package_path("features", f"{key}_train_{cfg.model_arch}_feature_mean.npy"),
+            package_path("features", PREPROCESSING_VERSION, f"{key}_train_{cfg.model_arch}_features.npy"),
+            package_path("features", PREPROCESSING_VERSION, f"{key}_train_{cfg.model_arch}_labels.npy"),
+            package_path("features", PREPROCESSING_VERSION, f"{key}_train_{cfg.model_arch}_feature_mean.npy"),
         )
-    if cfg.in_dataset == "imagenet" and cfg.model_arch == "resnet50":
+    if cfg.in_dataset == "imagenet" and cfg.model_arch in {"resnet50", "mobilenetv2"}:
         return (
-            package_path("imagenet_feature", "imagenet_train_resnet50_features.npy"),
-            package_path("imagenet_feature", "imagenet_train_resnet50_labels.npy"),
-            package_path("imagenet_feature", "imagenet_train_resnet50_feature_mean.npy"),
+            package_path("imagenet_feature", f"seed{cfg.seed}_n{cfg.imagenet_train_samples_per_class}_fraction{cfg.fit_class_fraction}", f"imagenet_train_{cfg.model_arch}_features.npy"),
+            package_path("imagenet_feature", f"seed{cfg.seed}_n{cfg.imagenet_train_samples_per_class}_fraction{cfg.fit_class_fraction}", f"imagenet_train_{cfg.model_arch}_labels.npy"),
+            package_path("imagenet_feature", f"seed{cfg.seed}_n{cfg.imagenet_train_samples_per_class}_fraction{cfg.fit_class_fraction}", f"imagenet_train_{cfg.model_arch}_feature_mean.npy"),
         )
     raise ValueError(f"Unsupported train feature source for {cfg.in_dataset}/{cfg.model_arch}")
 
 
 def _train_dataset(cfg: ExperimentConfig):
+    # The DICE DenseNet checkpoints use this same transform for both CIFAR tasks.
     if cfg.in_dataset == "CIFAR-10":
-        transform = transforms.Compose(
-            [
-                transforms.Resize(32),
-                transforms.CenterCrop(32),
-                transforms.ToTensor(),
-                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            ]
-        )
-        return torchvision.datasets.CIFAR10(root=package_path("id_datasets", "CIFAR-10"), train=True, download=False, transform=transform)
+        return torchvision.datasets.CIFAR10(root=package_path("id_datasets", "CIFAR-10"), train=True, download=False, transform=transform_test)
     if cfg.in_dataset == "CIFAR-100":
-        transform = transforms.Compose(
-            [
-                transforms.Resize(32),
-                transforms.CenterCrop(32),
-                transforms.ToTensor(),
-                transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762)),
-            ]
-        )
-        return torchvision.datasets.CIFAR100(root=package_path("id_datasets", "CIFAR-100"), train=True, download=False, transform=transform)
+        return torchvision.datasets.CIFAR100(root=package_path("id_datasets", "CIFAR-100"), train=True, download=False, transform=transform_test)
     if cfg.in_dataset == "imagenet":
-        transform = transforms.Compose(
-            [
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-        return torchvision.datasets.ImageFolder(package_path("id_datasets", "imagenet", "train"), transform=transform)
+        return torchvision.datasets.ImageFolder(package_path("id_datasets", "imagenet", "train"), transform=transform_test_largescale)
     raise ValueError(f"Unsupported train dataset for {cfg.in_dataset}/{cfg.model_arch}")
 
 
@@ -173,7 +158,7 @@ def load_or_extract_train_features(cfg: ExperimentConfig, model, num_classes: in
 
 
 def classifier_params(model, cfg: ExperimentConfig):
-    head = model.head if cfg.model_arch in {"swin", "efficientnet"} else model.fc
+    head = model.classifier[-1] if cfg.model_arch == "mobilenetv2" else (model.head if cfg.model_arch in {"swin", "efficientnet"} else model.fc)
     bias_vector = None
     weight_matrix = None
     for param in head.parameters():
@@ -205,9 +190,11 @@ def fit_or_load_subspaces(cfg: ExperimentConfig, model, subspace: str, num_class
     if subspace not in {"kpca", "kpca_linear", "kpca_poly", "pca"}:
         raise ValueError(f"Unsupported subspace: {subspace}")
 
-    cache_name = f"{subspace}_dim{cfg.dim}_seed{cfg.seed}"
+    fit_config = {k: v for k, v in asdict(cfg).items() if k not in {"force_refit", "modes", "base_output_dir", "subspace_cache_dir", "experiment_name", "out_datasets", "batch_size", "num_workers", "gpu"}}
+    fingerprint = hashlib.sha256(json.dumps({**fit_config, "preprocessing_version": PREPROCESSING_VERSION}, sort_keys=True).encode()).hexdigest()[:12]
+    cache_name = f"{subspace}_dim{cfg.dim}_seed{cfg.seed}_{fingerprint}"
     if subspace == "pca" and cfg.pca_components is not None:
-        cache_name = f"{subspace}_dim{cfg.dim}_components{cfg.pca_components}_seed{cfg.seed}"
+        cache_name = f"{subspace}_dim{cfg.dim}_components{cfg.pca_components}_seed{cfg.seed}_{fingerprint}"
     cache_dir = Path(cfg.subspace_cache_dir) / cfg.in_dataset / cache_name
     cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -216,6 +203,8 @@ def fit_or_load_subspaces(cfg: ExperimentConfig, model, subspace: str, num_class
     u = -np.matmul(pinv(weight_matrix), bias_vector)
     featuredim = feature_dim_for(cfg)
     n_components = featuredim - cfg.dim
+    if n_components < 1:
+        raise ValueError("dim must be smaller than the feature dimension")
     available_classes = np.asarray(sorted(np.unique(target_id_train)))
     selected_idx = class_order(len(available_classes), cfg.fit_class_fraction, cfg.seed)
     fit_classes = available_classes[selected_idx]
@@ -241,6 +230,13 @@ def fit_or_load_subspaces(cfg: ExperimentConfig, model, subspace: str, num_class
         if subspace.startswith("kpca"):
             n_components_eff = min(n_components, max(1, x.shape[0] - 1), x.shape[1])
             kernel = {"kpca": "rbf", "kpca_linear": "linear", "kpca_poly": "poly"}[subspace]
+            if cfg.evr is not None:
+                spectrum = KernelPCA(kernel=kernel, n_components=None).fit(x).eigenvalues_
+                positive = spectrum[spectrum > 0]
+                if not len(positive):
+                    raise ValueError("Cannot select an EVR rank from a zero-variance class")
+                rank = int(np.searchsorted(np.cumsum(positive) / positive.sum(), cfg.evr) + 1)
+                n_components_eff = min(rank, len(positive))
             estimator = KernelPCA(
                 kernel=kernel,
                 n_components=n_components_eff,
@@ -314,7 +310,8 @@ def extract_features_and_logits(model, inputs, cfg: ExperimentConfig):
             features = model.features(inputs)
             out = F.adaptive_avg_pool2d(features, 1)
             features = out.view(out.size(0), -1)
-            outputs = model.fc(c_pp_features(features, cfg))
+            head = model.classifier if cfg.model_arch == "mobilenetv2" else model.fc
+            outputs = head(c_pp_features(features, cfg))
         elif cfg.model_arch == "resnet18":
             feature1 = F.relu(model.bn1(model.conv1(inputs)))
             feature2 = model.layer1(feature1)

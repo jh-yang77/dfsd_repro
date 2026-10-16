@@ -44,8 +44,15 @@ class SVHN(data.Dataset):
             self.filename = self.split_list[split][1]
             self.file_md5 = self.split_list[split][2]
 
-        if download:
-
+        if self.split == "test":
+            # The archived evaluation split is not the complete official test file.
+            if download:
+                download_url(self.url, self.root, "test_32x32.mat", self.file_md5)
+            if download or not os.path.exists(os.path.join(root, self.filename)):
+                from pathlib import Path
+                from dfsd_repro.prepare_svhn import prepare
+                prepare(Path(root))
+        elif download:
             self.download()
 
         # import here rather than at top of file because this is

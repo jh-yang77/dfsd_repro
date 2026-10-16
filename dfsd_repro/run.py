@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import json
+import platform
+import importlib.metadata
+from dataclasses import asdict
+from datetime import datetime, timezone
 
 from dfsd_repro.config import load_config
 from dfsd_repro.dfsd import run_mode, set_reproducible_state
@@ -30,7 +35,19 @@ def main():
     set_reproducible_state(cfg)
     for mode in cfg.modes:
         if not args.metrics_only:
+            folder = cfg.score_dir(mode)
+            folder.mkdir(parents=True, exist_ok=True)
+            versions = {name: importlib.metadata.version(name) for name in ['torch', 'torchvision', 'numpy', 'scipy', 'scikit-learn']}
+            import torch
+            record = {'config': asdict(cfg), 'mode': mode, 'python': platform.python_version(),
+                      'packages': versions, 'gpu': torch.cuda.get_device_name() if torch.cuda.is_available() else None,
+                      'started_at': datetime.now(timezone.utc).isoformat(),
+                      'status': 'started'}
+            (folder / 'run_manifest.json').write_text(json.dumps(record, indent=2) + '\n')
             run_mode(cfg, mode)
+            record['status'] = 'completed'
+            record['finished_at'] = datetime.now(timezone.utc).isoformat()
+            (folder / 'run_manifest.json').write_text(json.dumps(record, indent=2) + '\n')
 
         score_dir = cfg.score_dir(mode)
         rows = summarize_score_dir(score_dir, cfg.out_datasets)

@@ -30,12 +30,12 @@ def get_dataloader(in_dataset,batch_size,args):
 
     if in_dataset == "CIFAR-10":
         testset = torchvision.datasets.CIFAR10(root=package_path("id_datasets", "CIFAR-10"), train=False, download=False, transform=transform_test)
-        testloaderIn = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=True, num_workers=2)
+        testloaderIn = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
         num_classes = 10
 
     elif in_dataset == "CIFAR-100":
         testset = torchvision.datasets.CIFAR100(root=package_path("id_datasets", "CIFAR-100"), train=False, download=False, transform=transform_test)
-        testloaderIn = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=True, num_workers=2)
+        testloaderIn = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
         num_classes = 100
 
     elif in_dataset == "imagenet":
@@ -50,7 +50,7 @@ def get_model(args,num_classes):
 
     if args.model_arch == 'densenet':
         key = args.in_dataset.lower().replace("-", "")
-        info = None if args.p is None else np.load(package_path("features", f"{key}_train_{args.model_arch}_feature_mean.npy"))
+        info = None if args.p is None else np.load(package_path("features", "shared_transforms_v2", f"{key}_train_{args.model_arch}_feature_mean.npy"))
         model = dn.DenseNet3(args.layers, num_classes, 12, reduction=0.5, bottleneck=True, dropRate=0.0, normalizer=None, p=args.p, info=info,ash=False)
         checkpoint = torch.load(
             package_path("checkpoints", args.in_dataset, "densenet", f"checkpoint_{args.epochs}.pth.tar"))
@@ -58,13 +58,17 @@ def get_model(args,num_classes):
 
     elif args.model_arch == 'resnet18':
         key = args.in_dataset.lower().replace("-", "")
-        info = None if args.p is None else np.load(package_path("features", f"{key}_train_{args.model_arch}_feature_mean.npy"))
+        info = None if args.p is None else np.load(package_path("features", "shared_transforms_v2", f"{key}_train_{args.model_arch}_feature_mean.npy"))
         model = ResNet18(num_classes= num_classes, p=args.p, info=info)
         checkpoint = torch.load(package_path("checkpoints", "best.ckpt"))
         model.load_state_dict(checkpoint)
 
+    elif args.model_arch == 'mobilenetv2':
+        from dfsd_repro.models.mobilenetv2 import mobilenet_v2
+        info = None if args.p is None else np.load(package_path("imagenet_feature", f"seed{args.seed}_n{args.imagenet_train_samples_per_class}_fraction{args.fit_class_fraction}", "imagenet_train_mobilenetv2_feature_mean.npy"))
+        model = mobilenet_v2(pretrained=True, p=args.p, info=info)
     elif args.model_arch == 'resnet50':
-        info = None if args.p is None else np.load(package_path("imagenet_feature", "imagenet_train_resnet50_feature_mean.npy"))
+        info = None if args.p is None else np.load(package_path("imagenet_feature", f"seed{args.seed}_n{args.imagenet_train_samples_per_class}_fraction{args.fit_class_fraction}", "imagenet_train_resnet50_feature_mean.npy"))
         num_classes = 1000
         from dfsd_repro.models.resnet import resnet50
         model = resnet50(num_classes=num_classes, pretrained=True, p=args.p, info=info, clip_threshold=args.clip_threshold)
@@ -79,13 +83,13 @@ def get_outdataset(out_dataset, in_dataset, batch_size):
     elif out_dataset == "dtd":
         transform = transform_test_largescale if in_dataset in {"imagenet"} else transform_test
         testsetout = torchvision.datasets.ImageFolder(root=package_path("ood_datasets", "dtd", "images"), transform=transform)
-        testloaderOut = torch.utils.data.DataLoader(testsetout, batch_size=batch_size, shuffle=True, num_workers=2)
+        testloaderOut = torch.utils.data.DataLoader(testsetout, batch_size=batch_size, shuffle=False, num_workers=2)
     elif out_dataset == "places365":
         testsetout = torchvision.datasets.ImageFolder(root=package_path("ood_datasets", "places365"), transform=transform_test)
-        testloaderOut = torch.utils.data.DataLoader(testsetout, batch_size=batch_size, shuffle=True, num_workers=2)
+        testloaderOut = torch.utils.data.DataLoader(testsetout, batch_size=batch_size, shuffle=False, num_workers=2)
     elif out_dataset == "CIFAR-100":
         testsetout = torchvision.datasets.CIFAR100(root=package_path("id_datasets", "CIFAR-100"), train=False, download=False, transform=transform_test)
-        testloaderOut = torch.utils.data.DataLoader(testsetout, batch_size=batch_size, shuffle=True, num_workers=2)
+        testloaderOut = torch.utils.data.DataLoader(testsetout, batch_size=batch_size, shuffle=False, num_workers=2)
     elif out_dataset == "inat":
         testloaderOut = torch.utils.data.DataLoader(
             torchvision.datasets.ImageFolder(package_path("ood_datasets", "iNaturalist"), transform=transform_test_largescale),
@@ -117,12 +121,12 @@ def get_outdataset(out_dataset, in_dataset, batch_size):
         testloaderOut = torch.utils.data.DataLoader(
             torchvision.datasets.ImageFolder(package_path("ood_datasets", "tiny-imagenet"), transform=transform_test),
             batch_size=batch_size,
-            shuffle=True,
+            shuffle=False,
             num_workers=2,
         )
     elif out_dataset == "MNIST":
         testset = torchvision.datasets.MNIST(package_path("ood_datasets", "MNIST"), train=False, download=False, transform=transform_test)
-        testloaderOut = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=True, num_workers=2)
+        testloaderOut = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
     elif out_dataset == "OpenImage-O":
         testloaderOut = torch.utils.data.DataLoader(
             torchvision.datasets.ImageFolder(package_path("ood_datasets", "openimage_o"), transform=transform_test_largescale),
